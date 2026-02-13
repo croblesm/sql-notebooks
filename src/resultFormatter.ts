@@ -59,7 +59,7 @@ export function toHtml(
     return [
         '<div style="max-height:300px;overflow:auto;">',
         '<table border="1" style="border-collapse:collapse;">',
-        `<thead style="position:sticky;top:0;"><tr>${headerCells}</tr></thead>`,
+        `<thead style="position:sticky;top:0;background:var(--vscode-editor-background,#1e1e1e);"><tr>${headerCells}</tr></thead>`,
         `<tbody>${bodyRows}</tbody>`,
         "</table>",
         "</div>",
