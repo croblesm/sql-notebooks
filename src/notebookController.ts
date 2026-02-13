@@ -59,9 +59,11 @@ export class SQLNotebookController implements vscode.Disposable {
 
         // Disable the MSSQL code lens while a notebook editor is active,
         // re-enable it when the user switches to a regular .sql file.
+        // Also update the status bar to reflect the active notebook.
         this.disposables.push(
             vscode.window.onDidChangeActiveNotebookEditor((editor) => {
                 this.toggleMssqlCodeLens(editor);
+                this.updateStatusBar(editor?.notebook);
             }),
         );
 
@@ -69,6 +71,40 @@ export class SQLNotebookController implements vscode.Disposable {
         if (vscode.window.activeNotebookEditor) {
             this.toggleMssqlCodeLens(vscode.window.activeNotebookEditor);
         }
+
+        // Auto-detect SQL notebooks and set affinity so VS Code
+        // auto-selects our kernel instead of showing "Detecting Kernels".
+        this.disposables.push(
+            vscode.workspace.onDidOpenNotebookDocument((notebook) => {
+                if (notebook.notebookType === "jupyter-notebook") {
+                    this.setAffinityIfSql(notebook);
+                }
+            }),
+        );
+
+        // Set affinity for notebooks already open when the extension activates
+        for (const notebook of vscode.workspace.notebookDocuments) {
+            if (notebook.notebookType === "jupyter-notebook") {
+                this.setAffinityIfSql(notebook);
+            }
+        }
+
+        // When our controller is selected for a notebook, ensure all code
+        // cells use SQL language. This fixes the case where cells were loaded
+        // as Python (Jupyter default) before our kernel was selected.
+        this.disposables.push(
+            this.controller.onDidChangeSelectedNotebooks(
+                ({ notebook, selected }) => {
+                    if (selected) {
+                        this.log.info(
+                            `[onDidChangeSelectedNotebooks] Selected for ${notebook.uri.toString()}`,
+                        );
+                        this.ensureSqlCellLanguage(notebook);
+                        this.updateStatusBar(notebook);
+                    }
+                },
+            ),
+        );
     }
 
     /**
@@ -101,6 +137,100 @@ export class SQLNotebookController implements vscode.Disposable {
                 vscode.ConfigurationTarget.Global,
             );
             this.mssqlCodeLensSaved = undefined;
+        }
+    }
+
+    /**
+     * Check if a notebook appears to be a SQL notebook (based on metadata
+     * and cell languages) and set controller affinity to Preferred.
+     * This ensures VS Code auto-selects our kernel when reopening saved
+     * SQL notebooks instead of showing "Detecting Kernels".
+     */
+    private setAffinityIfSql(notebook: vscode.NotebookDocument): void {
+        const metadata = notebook.metadata;
+
+        // Check kernelspec in notebook metadata.
+        // The ipynb serializer can nest metadata in different ways.
+        const kernelspec =
+            metadata?.custom?.metadata?.kernelspec ??
+            metadata?.metadata?.kernelspec ??
+            metadata?.kernelspec;
+
+        if (kernelspec) {
+            const name = String(kernelspec.name ?? "").toLowerCase();
+            const displayName = String(
+                kernelspec.display_name ?? "",
+            ).toLowerCase();
+            if (
+                name.includes("sql-notebook") ||
+                name === "sql" ||
+                displayName === "sql"
+            ) {
+                this.log.info(
+                    `[setAffinityIfSql] Matched kernelspec for ${notebook.uri.toString()}`,
+                );
+                this.controller.updateNotebookAffinity(
+                    notebook,
+                    vscode.NotebookControllerAffinity.Preferred,
+                );
+                return;
+            }
+        }
+
+        // Check language_info
+        const languageInfo =
+            metadata?.custom?.metadata?.language_info ??
+            metadata?.metadata?.language_info ??
+            metadata?.language_info;
+
+        if (languageInfo?.name?.toLowerCase() === "sql") {
+            this.log.info(
+                `[setAffinityIfSql] Matched language_info for ${notebook.uri.toString()}`,
+            );
+            this.controller.updateNotebookAffinity(
+                notebook,
+                vscode.NotebookControllerAffinity.Preferred,
+            );
+            return;
+        }
+
+        // Fallback: check if all code cells use SQL language
+        const codeCells = notebook
+            .getCells()
+            .filter((c) => c.kind === vscode.NotebookCellKind.Code);
+        if (
+            codeCells.length > 0 &&
+            codeCells.every((c) => c.document.languageId === "sql")
+        ) {
+            this.log.info(
+                `[setAffinityIfSql] All code cells are SQL for ${notebook.uri.toString()}`,
+            );
+            this.controller.updateNotebookAffinity(
+                notebook,
+                vscode.NotebookControllerAffinity.Preferred,
+            );
+        }
+    }
+
+    /**
+     * Ensure all code cells in the notebook use SQL language.
+     * When our controller is selected, cells may still have their default
+     * language (e.g. "python") from before the kernel was chosen.
+     */
+    private ensureSqlCellLanguage(notebook: vscode.NotebookDocument): void {
+        for (const cell of notebook.getCells()) {
+            if (
+                cell.kind === vscode.NotebookCellKind.Code &&
+                cell.document.languageId !== "sql"
+            ) {
+                this.log.info(
+                    `[ensureSqlCellLanguage] Cell ${cell.index}: "${cell.document.languageId}" → "sql"`,
+                );
+                vscode.languages.setTextDocumentLanguage(
+                    cell.document,
+                    "sql",
+                );
+            }
         }
     }
 

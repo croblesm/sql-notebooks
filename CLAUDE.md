@@ -97,6 +97,25 @@ The MSSQL extension's `SqlDocumentService.onDidOpenTextDocument()` auto-connects
 
 The MSSQL extension's `SimpleExecuteRequest` does not persist session state (e.g., `USE [database]`) between calls. Each `executeSimpleQuery()` call gets its own execution context. Therefore, switching databases requires disconnecting and reconnecting with a modified `IConnectionInfo` that has the new database name. This is the same pattern used by the MSSQL extension's copilot tools (`changeDatabaseTool.ts`).
 
+### IntelliSense Limitation
+
+The MSSQL extension's IntelliSense (completions, hover, diagnostics) is powered by the SQL Tools Language Server. The language client registers with `documentSelector: ["sql"]`, so notebook cells with `languageId === "sql"` automatically receive **basic keyword IntelliSense**.
+
+However, **context-aware IntelliSense** (table names, column names, stored procedures) requires the language server to associate a connection with each document via an `ownerUri`. The MSSQL extension's `SqlDocumentService.onDidOpenTextDocument()` auto-connects SQL documents to `_lastActiveConnectionInfo`, which may not match the notebook's actual connection — or may not exist at all.
+
+**Why we can't fix this from the companion extension:**
+- `IExtension.connect()` returns a `connectionUri` but doesn't accept a target document URI — we can't tell the language server "use this connection for this cell"
+- The MSSQL extension has zero notebook-specific code; its `ownerUri` → connection mapping is internal
+- `IExtension.sendRequest()` could theoretically send a `connection/connect` request with a cell's document URI as `ownerUri`, but the request types are undocumented and fragile
+
+**What would fix this upstream:** The MSSQL extension needs a notebook-aware API, e.g. `connectDocument(documentUri: string, connectionInfo: IConnectionInfo)`, that registers a connection with the language server for a specific document URI. This would let companion extensions provide context-aware IntelliSense for notebook cells.
+
+### Notebook Kernel Auto-Selection
+
+When reopening a saved `.ipynb` that was using the SQL kernel, VS Code may show "Detecting Kernels" and default cells to Python language (Jupyter default). This prevents our controller from executing cells since it only handles `languageId === "sql"`.
+
+**Workaround:** On activation, we set `NotebookControllerAffinity.Preferred` for any notebook that appears to be SQL (by checking `kernelspec` metadata, `language_info`, or cell languages). When our controller is selected, `onDidChangeSelectedNotebooks` fires and we explicitly set all code cells to SQL language via `vscode.languages.setTextDocumentLanguage()`.
+
 ## Code Conventions
 
 - TypeScript strict mode enabled

@@ -107,7 +107,7 @@ Type these in a code cell and run:
 |------------|---------|
 | **One connection per notebook** | All cells share a single connection. Use `%%connect` to switch servers, `%%use` to switch databases. |
 | **No session persistence** | Temp tables, variables, and `SET` options don't carry over between cells. Each cell execution gets its own context. |
-| **No IntelliSense** | SQL autocomplete is not yet available in notebook cells. |
+| **Limited IntelliSense** | Basic SQL keyword completions work in notebook cells, but context-aware IntelliSense (table names, column names) is unreliable. The MSSQL extension auto-connects documents to the last active connection, which may not match the notebook's connection. Full notebook IntelliSense requires upstream changes to the MSSQL extension. |
 | **Static result tables** | Results render as HTML tables without sorting or filtering. |
 
 ## How It Works
