@@ -9,6 +9,9 @@
         "type": "git",
         "url": "https://github.com/croblesm/sql-notebooks"
     },
+    "bugs": {
+        "url": "https://github.com/croblesm/sql-notebooks/issues"
+    },
     "homepage": "https://github.com/croblesm/sql-notebooks",
     "icon": "images/icon.png",
     "engines": {

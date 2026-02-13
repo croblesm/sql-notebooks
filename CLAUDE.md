@@ -105,13 +105,6 @@ The MSSQL extension's `SimpleExecuteRequest` does not persist session state (e.g
 - GO batch splitting uses regex: `/^\s*GO\s*$/gim`
 - Connection manager stores `connectionUri` (string from MSSQL extension) and `connectionInfo` (for reconnection during database switch)
 
-## Documentation
-
-Project documentation lives in `../Documentation/`:
-- `SQL Notebook PRD.md` — Product requirements (source of truth for what we're building)
-- `ARCHITECTURE.md`, `KERNEL_DESIGN.md`, `IMPLEMENTATION_PLAN.md` — Technical design
-- `DECISIONS.md` — Architectural decisions and tradeoffs
-
 ## Related Repositories
 
 - MSSQL Extension: https://github.com/microsoft/vscode-mssql (local clone at `~/vscode-mssql/`)
