@@ -1,0 +1,10 @@
+src/**
+typings/**
+tsconfig.json
+.vscode/**
+.github/**
+node_modules/**
+**/*.map
+CLAUDE.md
+.gitignore
+package-lock.json

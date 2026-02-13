@@ -1,0 +1,67 @@
+{
+    "name": "sql-notebooks",
+    "displayName": "SQL Notebooks",
+    "description": "SQL notebook support for VS Code — companion to MSSQL extension",
+    "publisher": "ms-mssql",
+    "version": "0.1.0",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/croblesm/sql-notebooks"
+    },
+    "homepage": "https://github.com/croblesm/sql-notebooks",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "Notebooks"
+    ],
+    "extensionDependencies": [
+        "ms-mssql.mssql"
+    ],
+    "activationEvents": [
+        "onNotebook:jupyter-notebook"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "sqlNotebooks.createNotebook",
+                "title": "Create SQL Notebook",
+                "category": "SQL Notebooks"
+            },
+            {
+                "command": "sqlNotebooks.changeDatabase",
+                "title": "Change Database",
+                "category": "SQL Notebooks"
+            },
+            {
+                "command": "sqlNotebooks.changeConnection",
+                "title": "Change Connection",
+                "category": "SQL Notebooks"
+            }
+        ],
+        "menus": {
+            "view/item/context": [
+                {
+                    "command": "sqlNotebooks.createNotebook",
+                    "when": "view == objectExplorer && viewItem =~ /\\btype=(disconnectedServer|Server|Database)\\b/",
+                    "group": "sqlnotebooks@1"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run build",
+        "build": "tsc -p tsconfig.json",
+        "watch": "tsc -watch -p tsconfig.json",
+        "package": "vsce package",
+        "lint": "eslint src --ext ts"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.85.0",
+        "@types/node": "^18.0.0",
+        "@vscode/vsce": "^3.0.0",
+        "typescript": "^5.3.0"
+    }
+}
