@@ -29,25 +29,34 @@ export function toHtml(
     const isTruncated = rows.length > MAX_ROWS_DISPLAY;
     const displayRows = rows.slice(0, MAX_ROWS_DISPLAY);
 
-    const headerCells = columns
-        .map(
-            (col) =>
-                `<th style="padding:4px 8px;text-align:left;">${escapeHtml(col.columnName)}</th>`,
-        )
-        .join("");
+    const borderColor = "var(--vscode-panel-border, #444)";
+    const headerBg = "var(--vscode-editorGroupHeader-tabsBackground, #252526)";
+    const rowNumBg = "var(--vscode-editorGroupHeader-tabsBackground, #252526)";
+    const rowNumColor = "var(--vscode-descriptionForeground, #858585)";
+    const cellStyle = `border:1px solid ${borderColor};padding:4px 8px;`;
+
+    const headerCells =
+        `<th style="${cellStyle}background:${headerBg};"></th>` +
+        columns
+            .map(
+                (col) =>
+                    `<th style="${cellStyle}background:${headerBg};text-align:left;font-weight:600;">${escapeHtml(col.columnName)}</th>`,
+            )
+            .join("");
 
     const bodyRows = displayRows
-        .map((row) => {
+        .map((row, rowIdx) => {
+            const rowNum = `<td style="${cellStyle}background:${rowNumBg};color:${rowNumColor};text-align:right;user-select:none;">${rowIdx + 1}</td>`;
             const cells = row
                 .map((cell) => {
                     const val = truncate(
                         escapeHtml(cellDisplayValue(cell)),
                         MAX_COLUMN_WIDTH,
                     );
-                    return `<td style="padding:4px 8px;">${val}</td>`;
+                    return `<td style="${cellStyle}">${val}</td>`;
                 })
                 .join("");
-            return `<tr>${cells}</tr>`;
+            return `<tr>${rowNum}${cells}</tr>`;
         })
         .join("\n");
 
@@ -58,8 +67,8 @@ export function toHtml(
 
     return [
         '<div style="max-height:300px;overflow:auto;">',
-        '<table border="1" style="border-collapse:collapse;">',
-        `<thead style="position:sticky;top:0;background:var(--vscode-editor-background,#1e1e1e);"><tr>${headerCells}</tr></thead>`,
+        `<table style="border-collapse:collapse;border:1px solid ${borderColor};font-size:12px;font-family:var(--vscode-editor-font-family, monospace);">`,
+        `<thead style="position:sticky;top:0;"><tr>${headerCells}</tr></thead>`,
         `<tbody>${bodyRows}</tbody>`,
         "</table>",
         "</div>",
