@@ -139,6 +139,14 @@ declare module "vscode-mssql" {
         rowCount: number;
         columnInfo: IDbColumn[];
         rows: DbCellValue[][];
+        messages?: ResultMessage[];
+    }
+
+    export interface ResultMessage {
+        batchId?: number;
+        isError: boolean;
+        time?: string;
+        message: string;
     }
 
     export interface IDbColumn {

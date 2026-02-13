@@ -332,9 +332,23 @@ export class SQLNotebookController implements vscode.Disposable {
         try {
             for (const batch of batches) {
                 const result = await connMgr.executeQuery(batch);
+                const messages = (result.messages ?? [])
+                    .filter((m) => !m.isError)
+                    .map((m) => m.message);
 
                 if (result.columnInfo && result.columnInfo.length > 0) {
                     // SELECT or similar — has result set
+                    // If there are also messages (e.g. PRINT), show them first
+                    if (messages.length > 0) {
+                        outputs.push(
+                            new vscode.NotebookCellOutput([
+                                vscode.NotebookCellOutputItem.text(
+                                    messages.join("\n"),
+                                    "text/plain",
+                                ),
+                            ]),
+                        );
+                    }
                     const html = formatter.toHtml(
                         result.columnInfo,
                         result.rows,
@@ -355,8 +369,18 @@ export class SQLNotebookController implements vscode.Disposable {
                             ),
                         ]),
                     );
+                } else if (messages.length > 0) {
+                    // PRINT-only output (no result set)
+                    outputs.push(
+                        new vscode.NotebookCellOutput([
+                            vscode.NotebookCellOutputItem.text(
+                                messages.join("\n"),
+                                "text/plain",
+                            ),
+                        ]),
+                    );
                 } else {
-                    // INSERT, UPDATE, DELETE, DDL
+                    // INSERT, UPDATE, DELETE, DDL — no messages, no result set
                     const msg =
                         result.rowCount >= 0
                             ? `(${result.rowCount} row(s) affected)`
