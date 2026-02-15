@@ -105,6 +105,34 @@ export class SQLNotebookController implements vscode.Disposable {
                 },
             ),
         );
+
+        // When new cells are added to a notebook, connect them to STS
+        // for IntelliSense if the notebook already has an active connection.
+        this.disposables.push(
+            vscode.workspace.onDidChangeNotebookDocument((e) => {
+                if (e.contentChanges.length === 0) {
+                    return;
+                }
+                const mgr = this.connections.get(
+                    e.notebook.uri.toString(),
+                );
+                if (!mgr?.isConnected()) {
+                    return;
+                }
+                for (const change of e.contentChanges) {
+                    for (const cell of change.addedCells) {
+                        if (
+                            cell.kind === vscode.NotebookCellKind.Code &&
+                            cell.document.languageId === "sql"
+                        ) {
+                            mgr.connectCellForIntellisense(
+                                cell.document.uri.toString(),
+                            );
+                        }
+                    }
+                }
+            }),
+        );
     }
 
     /**
@@ -234,6 +262,32 @@ export class SQLNotebookController implements vscode.Disposable {
         }
     }
 
+    /**
+     * Connect all SQL code cells in the notebook to STS for IntelliSense.
+     * Called after any connection state change (connect, disconnect+reconnect,
+     * database switch) so that cell URIs are registered with STS and
+     * completions/hover/diagnostics work.
+     */
+    private connectCellsForIntellisense(
+        notebook: vscode.NotebookDocument,
+    ): void {
+        const mgr = this.connections.get(notebook.uri.toString());
+        if (!mgr?.isConnected() || !mgr.getConnectionInfo()) {
+            return;
+        }
+
+        for (const cell of notebook.getCells()) {
+            if (
+                cell.kind === vscode.NotebookCellKind.Code &&
+                cell.document.languageId === "sql"
+            ) {
+                mgr.connectCellForIntellisense(
+                    cell.document.uri.toString(),
+                );
+            }
+        }
+    }
+
     private getConnectionManager(
         notebook: vscode.NotebookDocument,
     ): ConnectionManager {
@@ -303,7 +357,7 @@ export class SQLNotebookController implements vscode.Disposable {
 
         // Handle magic commands
         if (code.startsWith("%%")) {
-            await this.handleMagic(code, execution, connMgr);
+            await this.handleMagic(code, execution, connMgr, notebook);
             this.updateStatusBar(notebook);
             this.codeLensProvider.refresh();
             return;
@@ -312,6 +366,7 @@ export class SQLNotebookController implements vscode.Disposable {
         // Ensure we have a connection (one per notebook, reused across cells)
         try {
             await connMgr.ensureConnection();
+            this.connectCellsForIntellisense(notebook);
         } catch (err: any) {
             execution.replaceOutput([
                 new vscode.NotebookCellOutput([
@@ -417,6 +472,7 @@ export class SQLNotebookController implements vscode.Disposable {
         code: string,
         execution: vscode.NotebookCellExecution,
         connMgr: ConnectionManager,
+        notebook: vscode.NotebookDocument,
     ): Promise<void> {
         const lines = code.split("\n");
         const firstLine = lines[0].trim();
@@ -457,6 +513,7 @@ export class SQLNotebookController implements vscode.Disposable {
                     // Force a new connection prompt
                     connMgr.disconnect();
                     await connMgr.promptAndConnect();
+                    this.connectCellsForIntellisense(notebook);
                     const info = connMgr.getConnectionLabel();
                     execution.replaceOutput([
                         new vscode.NotebookCellOutput([
@@ -513,6 +570,7 @@ export class SQLNotebookController implements vscode.Disposable {
                     }
 
                     await connMgr.changeDatabase(targetDb);
+                    this.connectCellsForIntellisense(notebook);
                     execution.replaceOutput([
                         new vscode.NotebookCellOutput([
                             vscode.NotebookCellOutputItem.text(
@@ -566,6 +624,7 @@ export class SQLNotebookController implements vscode.Disposable {
             // Not connected yet — prompt for a connection first
             const connMgr = this.getConnectionManager(notebook);
             await connMgr.promptAndConnect();
+            this.connectCellsForIntellisense(notebook);
             this.updateStatusBar(notebook);
             this.codeLensProvider.refresh();
             return;
@@ -593,6 +652,7 @@ export class SQLNotebookController implements vscode.Disposable {
         }
 
         await mgr.changeDatabase(picked.label);
+        this.connectCellsForIntellisense(notebook);
         this.updateStatusBar(notebook);
         this.codeLensProvider.refresh();
     }
@@ -611,6 +671,7 @@ export class SQLNotebookController implements vscode.Disposable {
         const mgr = this.getConnectionManager(notebook);
         mgr.disconnect();
         await mgr.promptAndConnect();
+        this.connectCellsForIntellisense(notebook);
         this.updateStatusBar(notebook);
         this.codeLensProvider.refresh();
     }
@@ -639,6 +700,7 @@ export class SQLNotebookController implements vscode.Disposable {
         if (connectionInfo) {
             const connMgr = this.getConnectionManager(notebook);
             await connMgr.connectWith(connectionInfo);
+            this.connectCellsForIntellisense(notebook);
 
             const label = connMgr.getConnectionLabel();
             this.updateStatusBar(notebook);

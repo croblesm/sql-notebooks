@@ -35,6 +35,12 @@ declare module "vscode-mssql" {
 
         getServerInfo(connectionInfo: IConnectionInfo): IServerInfo;
 
+        createConnectionDetails(
+            connectionInfo: IConnectionInfo,
+        ): ConnectionDetails;
+
+        sendRequest(requestType: any, params?: any): Promise<any>;
+
         readonly connectionSharing: IConnectionSharingService;
     }
 
