@@ -142,37 +142,38 @@ export class ConnectionManager implements vscode.Disposable {
 
         // Verify we're on the correct database.
         let actualDb = "(unknown)";
-        if (database) {
-            try {
-                actualDb = await this.queryActualDatabase(uri);
-                this.log.info(
-                    `[connectWith] Actual DB: ${actualDb}, Expected: ${database}`,
-                );
+        try {
+            actualDb = await this.queryActualDatabase(uri);
+            this.log.info(
+                `[connectWith] Actual DB: ${actualDb}, Expected: ${database || "(none)"}`,
+            );
 
-                if (
-                    actualDb.toLowerCase() !== database.toLowerCase() &&
-                    actualDb !== "(unknown)"
-                ) {
-                    // Wrong database — disconnect and reconnect with correct DB
-                    this.log.info(
-                        `[connectWith] Database mismatch! Reconnecting with [${database}]`,
-                    );
-                    this.api!.connectionSharing.disconnect(uri);
-                    const fixedInfo = { ...connectionInfo, database };
-                    const newUri = await this.api!.connect(fixedInfo, false);
-                    actualDb = await this.queryActualDatabase(newUri);
-                    this.log.info(
-                        `[connectWith] After reconnect: ${actualDb}, URI=${newUri}`,
-                    );
-                    this.connectionUri = newUri;
-                    this.connectionInfo = { ...connectionInfo, database: actualDb };
-                    this.connectionLabel = formatConnectionLabel(server, actualDb);
-                    return newUri;
-                }
-            } catch (err: any) {
+            if (
+                database &&
+                actualDb.toLowerCase() !== database.toLowerCase() &&
+                actualDb !== "(unknown)"
+            ) {
+                // Wrong database — disconnect and reconnect with correct DB
                 this.log.info(
-                    `[connectWith] DB verification failed: ${err.message}`,
+                    `[connectWith] Database mismatch! Reconnecting with [${database}]`,
                 );
+                this.api!.connectionSharing.disconnect(uri);
+                const fixedInfo = { ...connectionInfo, database };
+                const newUri = await this.api!.connect(fixedInfo, false);
+                actualDb = await this.queryActualDatabase(newUri);
+                this.log.info(
+                    `[connectWith] After reconnect: ${actualDb}, URI=${newUri}`,
+                );
+                this.connectionUri = newUri;
+                this.connectionInfo = { ...connectionInfo, database: actualDb };
+                this.connectionLabel = formatConnectionLabel(server, actualDb);
+                return newUri;
+            }
+        } catch (err: any) {
+            this.log.info(
+                `[connectWith] DB verification failed: ${err.message}`,
+            );
+            if (database) {
                 actualDb = database;
             }
         }
