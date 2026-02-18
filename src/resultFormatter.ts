@@ -45,7 +45,7 @@ export function toHtml(
         columns
             .map(
                 (col) =>
-                    `<th style="${thStyle}min-width:40px;"><span>${escapeHtml(col.columnName)}</span><div class="${tableId}-handle" style="${handleStyle}"></div></th>`,
+                    `<th style="${thStyle}min-width:100px;white-space:nowrap;"><span>${escapeHtml(col.columnName)}</span><div class="${tableId}-handle" style="${handleStyle}"></div></th>`,
             )
             .join("");
 
@@ -105,7 +105,7 @@ export function toHtml(
 
     return [
         '<div style="max-height:300px;overflow:auto;">',
-        `<table id="${tableId}" style="border-collapse:collapse;border:1px solid ${borderColor};font-size:12px;font-family:var(--vscode-editor-font-family, monospace);table-layout:fixed;">`,
+        `<table id="${tableId}" style="border-collapse:collapse;border:1px solid ${borderColor};font-size:12px;font-family:var(--vscode-editor-font-family, monospace);">`,
         `<thead style="position:sticky;top:0;"><tr>${headerCells}</tr></thead>`,
         `<tbody>${bodyRows}</tbody>`,
         "</table>",
