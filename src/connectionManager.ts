@@ -1,5 +1,9 @@
 import * as vscode from "vscode";
-import type { IExtension, IConnectionInfo } from "vscode-mssql";
+import type {
+    IExtension,
+    IConnectionInfo,
+    ConnectionDetails,
+} from "vscode-mssql";
 import { getMssqlApi } from "./mssqlExtensionApi";
 
 const OUR_EXTENSION_ID = "ms-mssql.sql-notebooks";
@@ -138,37 +142,38 @@ export class ConnectionManager implements vscode.Disposable {
 
         // Verify we're on the correct database.
         let actualDb = "(unknown)";
-        if (database) {
-            try {
-                actualDb = await this.queryActualDatabase(uri);
-                this.log.info(
-                    `[connectWith] Actual DB: ${actualDb}, Expected: ${database}`,
-                );
+        try {
+            actualDb = await this.queryActualDatabase(uri);
+            this.log.info(
+                `[connectWith] Actual DB: ${actualDb}, Expected: ${database || "(none)"}`,
+            );
 
-                if (
-                    actualDb.toLowerCase() !== database.toLowerCase() &&
-                    actualDb !== "(unknown)"
-                ) {
-                    // Wrong database — disconnect and reconnect with correct DB
-                    this.log.info(
-                        `[connectWith] Database mismatch! Reconnecting with [${database}]`,
-                    );
-                    this.api!.connectionSharing.disconnect(uri);
-                    const fixedInfo = { ...connectionInfo, database };
-                    const newUri = await this.api!.connect(fixedInfo, false);
-                    actualDb = await this.queryActualDatabase(newUri);
-                    this.log.info(
-                        `[connectWith] After reconnect: ${actualDb}, URI=${newUri}`,
-                    );
-                    this.connectionUri = newUri;
-                    this.connectionInfo = { ...connectionInfo, database: actualDb };
-                    this.connectionLabel = formatConnectionLabel(server, actualDb);
-                    return newUri;
-                }
-            } catch (err: any) {
+            if (
+                database &&
+                actualDb.toLowerCase() !== database.toLowerCase() &&
+                actualDb !== "(unknown)"
+            ) {
+                // Wrong database — disconnect and reconnect with correct DB
                 this.log.info(
-                    `[connectWith] DB verification failed: ${err.message}`,
+                    `[connectWith] Database mismatch! Reconnecting with [${database}]`,
                 );
+                this.api!.connectionSharing.disconnect(uri);
+                const fixedInfo = { ...connectionInfo, database };
+                const newUri = await this.api!.connect(fixedInfo, false);
+                actualDb = await this.queryActualDatabase(newUri);
+                this.log.info(
+                    `[connectWith] After reconnect: ${actualDb}, URI=${newUri}`,
+                );
+                this.connectionUri = newUri;
+                this.connectionInfo = { ...connectionInfo, database: actualDb };
+                this.connectionLabel = formatConnectionLabel(server, actualDb);
+                return newUri;
+            }
+        } catch (err: any) {
+            this.log.info(
+                `[connectWith] DB verification failed: ${err.message}`,
+            );
+            if (database) {
                 actualDb = database;
             }
         }
@@ -262,6 +267,58 @@ export class ConnectionManager implements vscode.Disposable {
 
     getConnectionLabel(): string {
         return this.connectionLabel || "Not connected";
+    }
+
+    getConnectionInfo(): IConnectionInfo | undefined {
+        return this.connectionInfo;
+    }
+
+    /**
+     * Register a cell document URI with STS so IntelliSense
+     * (completions, hover, diagnostics) works for notebook cells.
+     *
+     * Sends a `connection/connect` request to STS with the cell's
+     * document URI as ownerUri and the notebook's connection details.
+     * STS shares metadata caches across connections with the same
+     * server/database/auth, so this doesn't cause redundant queries.
+     */
+    async connectCellForIntellisense(cellDocumentUri: string): Promise<void> {
+        if (!this.api || !this.connectionInfo) {
+            return;
+        }
+
+        let connectionDetails: ConnectionDetails;
+        try {
+            connectionDetails = this.api.createConnectionDetails(
+                this.connectionInfo,
+            );
+        } catch (err: any) {
+            this.log.warn(
+                `[connectCellForIntellisense] createConnectionDetails failed: ${err.message}`,
+            );
+            return;
+        }
+
+        try {
+            // Use a plain object with a `method` property — matches the
+            // shape that vscode-languageclient's RequestType exposes.
+            // We can't import the real RequestType class because
+            // vscode-mssql is an ambient .d.ts module with no runtime JS.
+            const connectRequest = { method: "connection/connect" };
+
+            await this.api.sendRequest(connectRequest as any, {
+                ownerUri: cellDocumentUri,
+                connection: connectionDetails,
+            });
+
+            this.log.info(
+                `[connectCellForIntellisense] Connected cell: ${cellDocumentUri}`,
+            );
+        } catch (err: any) {
+            this.log.warn(
+                `[connectCellForIntellisense] sendRequest failed: ${err.message}`,
+            );
+        }
     }
 
     dispose(): void {

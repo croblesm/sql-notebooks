@@ -35,6 +35,12 @@ declare module "vscode-mssql" {
 
         getServerInfo(connectionInfo: IConnectionInfo): IServerInfo;
 
+        createConnectionDetails(
+            connectionInfo: IConnectionInfo,
+        ): ConnectionDetails;
+
+        sendRequest(requestType: any, params?: any): Promise<any>;
+
         readonly connectionSharing: IConnectionSharingService;
     }
 
@@ -139,6 +145,14 @@ declare module "vscode-mssql" {
         rowCount: number;
         columnInfo: IDbColumn[];
         rows: DbCellValue[][];
+        messages?: ResultMessage[];
+    }
+
+    export interface ResultMessage {
+        batchId?: number;
+        isError: boolean;
+        time?: string;
+        message: string;
     }
 
     export interface IDbColumn {
